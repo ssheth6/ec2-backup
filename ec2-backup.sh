@@ -1,16 +1,20 @@
 #!/bin/bash
+##
+##FUNCTIONS
+##
+method_type()
+{
+	
+}
 
 ##
 ##
 ## Main
 ##
 ##
-
-
   option=$1
   inet_string=""
   usage=$0"-h|-m|-v"
-  export IFS=
   case "$option" in
 
       "-h")
