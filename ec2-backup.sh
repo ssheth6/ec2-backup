@@ -20,7 +20,12 @@ volume= aws ec2 describe-volumes | grep VolumeId volume.txt | awk '{print $2}' |
 ##
 method_type()
 {
-	
+	if [$m = rysnc]
+		then
+			rsync -az $dir ec2-user@$publicDns:/dev/sdf
+	else
+		dd if=/dev/sdf of=$publicDns:/dev/sdf bs=$CHECK
+	fi	
 }
 
 ##
