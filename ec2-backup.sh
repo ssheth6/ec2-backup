@@ -12,27 +12,24 @@ method_type()
 ## Main
 ##
 ##
-  option=$1
-  inet_string=""
-  usage=$0"-h|-m|-v"
-  case "$option" in
-
-      "-h")
-	  helptext
-	  ;;
-
-      "-m")
-          method_type    #call method function
-	  ;;
-
-      "-v")
-	  volume_id  #call volumeID function
-	  ;;
-      *)
-        echo " The parameter passed is invalid" $usage
-        
-	;;
-  esac
+  while getopts ":h:m:v:" o; do
+    case "${o}" in
+        m)
+            m=${OPTARG}
+            dir=$3
+                echo "$m"
+                echo "$dir"
+            ;;
+        v)
+            v=${OPTARG}
+         dir=$3
+                echo "$v"
+                echo "$dir"
+          ;;
+        h)
+            echo "Usage: $0 [-m type of backup] [-v volume-id ]"
+            ;;
+    esac done
 
 ###end of case statement
 
