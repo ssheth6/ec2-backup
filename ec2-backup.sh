@@ -24,7 +24,7 @@ method_type()
 		then
 			rsync -az $dir ec2-user@$publicDns:/dev/sdf
 	else
-		dd if=/dev/sdf of=$publicDns:/dev/sdf bs=$CHECK
+		dd if=$dir of=$publicDns:/dev/sdf bs=$CHECK
 	fi	
 }
 
