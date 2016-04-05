@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-##Variables##
+##Begin Variables##
 publicDns= aws ec2 describe-instances | grep PublicDns | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g'
 instanceId= aws ec2 describe-instances | grep InstanceId | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g'
 timeZone= aws ec2 describe-instances | grep AvailabilityZone | awk '{print $2}' | sed 's/\"//g'
@@ -13,6 +13,9 @@ createVolume= aws ec2 create-volume --size $CHECK --availability-zone $timeZone 
 attachVolume= aws ec2 attach-volume --volume-id $volume --instance-id $instanceId --device /dev/sdf
 
 volume= aws ec2 describe-volumes | grep VolumeId volume.txt | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g'
+
+mount_dir= ssh ec2-user@$publicDns 'sudo su file -s /dev/sdf | mkfs -t ext4 /dev/sdf | mkdir /$dir | mount /dev/sdf /$dir'
+####End Variables ###
 
 
 ##
