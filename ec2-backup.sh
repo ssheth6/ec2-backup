@@ -41,14 +41,14 @@ method_type()
         m)
             m=${OPTARG}
             dir=$3
-                echo "$m"
-                echo "$dir"
+                #echo "$m"
+                #echo "$dir"
             ;;
         v)
             v=${OPTARG}
          dir=$3
-                echo "$v"
-                echo "$dir"
+                #echo "$v"
+                #echo "$dir"
           ;;
         h)
             echo "Usage: $0 [-m type of backup] [-v volume-id ]"
