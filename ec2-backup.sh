@@ -44,8 +44,6 @@ runInstance() {
 createVolume() {
 
         CHECK=$(du -ms $dir | cut -f1)
-        #CHECK=3000
-        echo $CHECK
         if [ $CHECK -lt 1000 ]; then
                
                 SIZE=1
@@ -60,6 +58,7 @@ createVolume() {
 	if [$v == ' ' ]; then
 		$createVolume
 		$volumeId
+		echo $volumeId
 		$attachVolume
 		$mountVolume
 	
