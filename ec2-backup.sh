@@ -12,7 +12,7 @@ runInstance= aws ec2 run-instances --instance-type t1.micro --key ec2BackUpKeyPa
 createVolume= aws ec2 create-volume --size $CHECK --availability-zone $timeZone --volume-type standard
 attachVolume= aws ec2 attach-volume --volume-id $volume --instance-id $instanceId --device /dev/sdf
 
-volume= aws ec2 describe-volumes | grep VolumeId volume.txt | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g'
+volume= aws ec2 describe-volumes | grep VolumeId | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g'
 
 volumeId = aws ec2 describe-volumes | grep VolumeId | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g'
 
