@@ -31,6 +31,23 @@ method_type()
 	fi	
 }
 
+createVolume() {
+        CHECK=$(du -ms $dir | cut -f1)
+        #CHECK=3000
+        echo $CHECK
+        if [ $CHECK -lt 1000 ]; then
+               
+                SIZE=1
+                
+        else
+                SIZE=$((2 * $CHECK / 1000))
+               
+
+        fi
+
+}
+
+
 ##
 ##
 ## Main
