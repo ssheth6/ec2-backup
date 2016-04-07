@@ -14,13 +14,13 @@ attachVolume= aws ec2 attach-volume --volume-id $volume --instance-id $instanceI
 
 volume= aws ec2 describe-volumes | grep VolumeId | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g'
 
-volumeId = aws ec2 describe-volumes | grep VolumeId | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g'
+volumeId= aws ec2 describe-volumes | grep VolumeId | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g'
 
-mount_dir= ssh ec2-user@$publicDns 'sudo su file -s /dev/sdf | mkfs -t ext4 /dev/sdf | mkdir /$dir | mount /dev/sdf /$dir'
+#mount_dir= ssh ec2-user@$publicDns 'sudo su file -s /dev/sdf | mkfs -t ext4 /dev/sdf | mkdir /$dir | mount /dev/sdf /$dir'
 
-mountVolume = ssh -i ec2BackUpKeyPair.pem ec2-user@$publicDns 'sudo file -s /dev/sdf | sudo mkfs -t ext4 /dev/sdf | sudo mkdir /data | sudo mount /dev/sdf /data'
+mountVolume= ssh -i ec2BackUpKeyPair.pem ec2-user@$publicDns 'sudo file -s /dev/sdf | sudo mkfs -t ext4 /dev/sdf | sudo mkdir /data | sudo mount /dev/sdf /data'
 
-volumeState = aws ec2 describe-volumes | grep State | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g'
+volumeState= aws ec2 describe-volumes | grep State | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g'
 ####End Variables ###
 ##
 
@@ -64,7 +64,7 @@ createVolume() {
 	
 	##If volumen flag has a value, check if it is already attached. If so, echo an error and if not use that volume id to attach and mount
 	else
-        $volumeState
+        	$volumeState
 		
 		if [ volumeState == 'attached' ]; then
 			echo "Please specify a volume that is available."
@@ -81,8 +81,11 @@ backupType()
                 then
 
                 rsync -az $dir ec2-user@$publicDns:/dev/sdf
-        else
+        elif [ $m == 'dd' ];
+		then
                 dd if=$dir of=$publicDns:/dev/sdf bs=$CHECK
+	else
+		echo "Please specify a valid value. Available methods are 'rsync' and 'dd'"
         fi
 }
 
