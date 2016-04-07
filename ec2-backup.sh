@@ -44,16 +44,13 @@ runInstance() {
 createVolume() {
 
         CHECK=$(du -ms $dir | cut -f1)
+	## If directory size is less than 1GB then set the storage space to 1GB
         if [ $CHECK -lt 1000 ]; then
-               
                 SIZE=1
-                
         else
                 SIZE=$((2 * $CHECK / 1000))
-               
 
         fi
-	
 	##If volume flag value is empty we create a ne wone and attach
 	if [$v == ' ' ]; then
 		$createVolume
