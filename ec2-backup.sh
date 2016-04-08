@@ -75,7 +75,6 @@ createVolume() {
 		volumeId=$(aws ec2 create-volume --size $SIZE --availability-zone $timeZone --volume-type standard | grep VolumeId | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
 		echo $volumeId
 		sleep 60
-		#volumeId=$(aws ec2 describe-volumes | grep VolumeId | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
 		attachVolume=$(aws ec2 attach-volume --volume-id $volumeId --instance-id $instanceId --device /dev/sdf)
 		echo "attached new volume"
 		mountVolume=$(ssh -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns 'sudo mkfs -t ext4 /dev/xvdf | sudo mkdir -m 755 /data | sudo mount /dev/xvdf /data -t ext4')
@@ -88,7 +87,8 @@ createVolume() {
 			echo "Please specify a volume that is available."
 		else
 			attachVolume=$(aws ec2 attach-volume --volume-id $vol --instance-id $instanceId --device /dev/sdf)
-                	mountVolume=$(ssh -i ~/ec2BackUpKeyPair.pem ec2-user@$publicDns 'sudo file -s /dev/sdf | sudo mkfs -t ext4 /dev/sdf | sudo mkdir -m 000 /data | sudo mount /dev/sdf /data')
+			mountVolume=$(ssh -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns 'sudo mkfs -t ext4 /dev/xvdf | sudo mkdir -m 755 /data | sudo mount /dev/xvdf /data -t ext4')
+
 		fi
 	fi
 }
@@ -97,7 +97,7 @@ createBackup()
 {
         if [ "$m"="rysnc" ];
                 then
-                rsync -az $dir ec2-user@$publicDns:/data
+                rsync -az $dir unbuntu@$publicDns:/data
         elif [ "$m"="dd" ];
 		then
                 dd if=$dir of=$publicDns:/data bs=$CHECK
