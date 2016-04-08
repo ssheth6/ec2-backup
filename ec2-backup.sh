@@ -33,7 +33,7 @@ generateKeyPair() {
 		echo "Key pair already exists"
 	else
 
-        	tmp2=$(aws ec2 create-key-pair --key-name ec2BackUpKeyPair --query 'KeyMaterial' --output text > ~/ec2BackUpKeyPair.pem)
+        	aws ec2 create-key-pair --key-name ec2BackUpKeyPair --query 'KeyMaterial' --output text > ~/ec2BackUpKeyPair.pem
 		#chmod 600 /home/ssheth6/ec2BackUpKeyPair.pem
 		groupId=$(aws ec2 create-security-group --group-name ec2-backup-sg --description "EC2 backup tool group" | grep GroupId | head -1 | awk '{print $2}' | sed 's/\"//g')
 	        tmp=$(aws ec2 authorize-security-group-ingress --group-name ec2-backup-sg --protocol tcp --port 22 --cidr 0.0.0.0/0)
@@ -76,10 +76,9 @@ createVolume() {
 		echo $volumeId
 		sleep 60
 		#volumeId=$(aws ec2 describe-volumes | grep VolumeId | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
-		
 		attachVolume=$(aws ec2 attach-volume --volume-id $volumeId --instance-id $instanceId --device /dev/sdf)
 		echo "attached new volume"
-		mountVolume=$(ssh -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns 'sudo file -s /dev/sdf | sudo mkfs -t ext4 /dev/sdf | sudo mkdir /data | sudo mount /dev/sdf /data')
+		mountVolume=$(ssh -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns 'sudo mkfs -t ext4 /dev/xvdf | sudo mkdir -m 755 /data | sudo mount /dev/xvdf /data -t ext4')
 		echo "Mounted"
 	##If volumen flag has a value, check if it is already attached. If so, echo an error and if not use that volume id to attach and mount
 	else
@@ -89,7 +88,7 @@ createVolume() {
 			echo "Please specify a volume that is available."
 		else
 			attachVolume=$(aws ec2 attach-volume --volume-id $vol --instance-id $instanceId --device /dev/sdf)
-                	mountVolume=$(ssh -i ~/ec2BackUpKeyPair.pem ec2-user@$publicDns 'sudo file -s /dev/sdf | sudo mkfs -t ext4 /dev/sdf | sudo mkdir /data | sudo mount /dev/sdf /data')
+                	mountVolume=$(ssh -i ~/ec2BackUpKeyPair.pem ec2-user@$publicDns 'sudo file -s /dev/sdf | sudo mkfs -t ext4 /dev/sdf | sudo mkdir -m 000 /data | sudo mount /dev/sdf /data')
 		fi
 	fi
 }
