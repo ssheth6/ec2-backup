@@ -33,7 +33,8 @@ generateKeyPair() {
 		echo "Key pair already exists"
 	else
 
-        	aws ec2 create-key-pair --key-name ec2BackUpKeyPair --output text > ~/ec2BackUpKeyPair.pem | chmod 600 ~/ec2BackUpKeyPair.pem
+        	aws ec2 create-key-pair --key-name ec2BackUpKeyPair --query 'KeyMaterial' --output text > ~/ec2BackUpKeyPair.pem
+	#chmod 600 /home/ssheth6/ec2BackUpKeyPair.pem
 		echo "Key pair created"
 	fi
 }
@@ -42,6 +43,8 @@ runInstance() {
 
 	instanceId=$(aws ec2 run-instances --instance-type t1.micro --key ec2BackUpKeyPair --image-id ami-c27e48aa | grep InstanceId | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
 	echo "from echo $instanceId"
+	sleep 30
+	chmod 400 ~/ec2BackUpKeyPair.pem
 	#instanceId= $runInstance | grep InstanceId | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g'
         #echo "Instance ID:" $instanceId
 	publicDns=$(aws ec2 describe-instances --instance-ids $instanceId | grep PublicDns | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
@@ -61,32 +64,35 @@ createVolume() {
         fi
 	
 	##If volume flag value is empty we create a new one and attach
-	if [ "$v" == " " ]; then
-		createVolume=$(aws ec2 create-volume --size $CHECK --availability-zone $timeZone --volume-type standard)
-		volumeId=$(aws ec2 describe-volumes | grep VolumeId | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
+	if [ "$v"=" " ]; then
+		volumeId=$(aws ec2 create-volume --size $SIZE --availability-zone $timeZone --volume-type standard | grep VolumeId | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
 		echo $volumeId
-		attachVolume=$(aws ec2 attach-volume --volume-id $volume --instance-id $instanceId --device /dev/sdf)
-		mountVolume=$(ssh -i ec2BackUpKeyPair.pem ec2-user@$publicDns 'sudo file -s /dev/sdf | sudo mkfs -t ext4 /dev/sdf | sudo mkdir /data | sudo mount /dev/sdf /data')
-	
+		sleep 60
+		#volumeId=$(aws ec2 describe-volumes | grep VolumeId | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
+		
+		attachVolume=$(aws ec2 attach-volume --volume-id $volumeId --instance-id $instanceId --device /dev/sdf)
+		echo "attached new volume"
+		mountVolume=$(ssh -oStrictHostKeyChecking=no -i ~/ec2BackUpKeyPair.pem ec2-user@$publicDns 'sudo file -s /dev/sdf | sudo mkfs -t ext4 /dev/sdf | sudo mkdir /data | sudo mount /dev/sdf /data')
+		echo "Mounted"
 	##If volumen flag has a value, check if it is already attached. If so, echo an error and if not use that volume id to attach and mount
 	else
-        	volumeState=$(aws ec2 describe-volumes | grep State | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
+        	volumeState=$(aws ec2 describe-volumes --volume-ids $vol | grep State | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
 		echo "$volumeState"
-		if [ "$volumeState" == "attached" ]; then
+		if [ "$volumeState"="attached" ]; then
 			echo "Please specify a volume that is available."
 		else
 			attachVolume=$(aws ec2 attach-volume --volume-id $vol --instance-id $instanceId --device /dev/sdf)
-                	mountVolume=$(ssh -i ec2BackUpKeyPair.pem ec2-user@$publicDns 'sudo file -s /dev/sdf | sudo mkfs -t ext4 /dev/sdf | sudo mkdir /data | sudo mount /dev/sdf /data')
+                	mountVolume=$(ssh -i ~/ec2BackUpKeyPair.pem ec2-user@$publicDns 'sudo file -s /dev/sdf | sudo mkfs -t ext4 /dev/sdf | sudo mkdir /data | sudo mount /dev/sdf /data')
 		fi
 	fi
 }
 
 createBackup()
 {
-        if [ "$m" == "rysnc" ];
+        if [ "$m"="rysnc" ];
                 then
                 rsync -az $dir ec2-user@$publicDns:/data
-        elif [ "$m" == "dd" ];
+        elif [ "$m"="dd" ];
 		then
                 dd if=$dir of=$publicDns:/data bs=$CHECK
 	else
@@ -99,6 +105,7 @@ createBackup()
 ## Main
 ##
 ##
+
   while getopts ":hm:v:" o; do
     case "${o}" in
         m)
@@ -115,6 +122,7 @@ createBackup()
         v)
             v=${OPTARG}
             vol=$3
+	
                 #echo "$v"
                 #echo "$dir"
           ;;
