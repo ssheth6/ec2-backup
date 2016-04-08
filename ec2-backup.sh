@@ -33,18 +33,25 @@ generateKeyPair() {
 		echo "Key pair already exists"
 	else
 
-        	aws ec2 create-key-pair --key-name ec2BackUpKeyPair --query 'KeyMaterial' --output text > ~/ec2BackUpKeyPair.pem
-	#chmod 600 /home/ssheth6/ec2BackUpKeyPair.pem
+        	tmp2=$(aws ec2 create-key-pair --key-name ec2BackUpKeyPair --query 'KeyMaterial' --output text > ~/ec2BackUpKeyPair.pem)
+		#chmod 600 /home/ssheth6/ec2BackUpKeyPair.pem
+		groupId=$(aws ec2 create-security-group --group-name ec2-backup-sg --description "EC2 backup tool group" | grep GroupId | head -1 | awk '{print $2}' | sed 's/\"//g')
+	        tmp=$(aws ec2 authorize-security-group-ingress --group-name ec2-backup-sg --protocol tcp --port 22 --cidr 0.0.0.0/0)
 		echo "Key pair created"
 	fi
 }
 
 runInstance() {
 
-	instanceId=$(aws ec2 run-instances --instance-type t1.micro --key ec2BackUpKeyPair --image-id ami-c27e48aa | grep InstanceId | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
+	#aws ec2-create-group --group-name ec2-backup-sg -d "EC2 backup tool group" 
+	#aws ec2 authorize-security-group-ingress --group-name ec2-backup-sg --protocol tcp --port 22 --cidr 0.0.0.0/0
+	groupId=$(aws ec2 describe-security-groups --group-names ec2-backup-sg | grep GroupId | head -1 | awk '{print $2}' | sed 's/\"//g')
+	instanceId=$(aws ec2 run-instances --instance-type t2.micro --key ec2BackUpKeyPair --image-id ami-fce3c696 --security-group-ids $groupId | grep InstanceId | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
 	echo "from echo $instanceId"
 	sleep 30
 	chmod 400 ~/ec2BackUpKeyPair.pem
+	#echo "Adding Security Group"
+	#aws ec2 modify-instance-attribute --instance-id $instanceId --groups ec2-backup-sg
 	#instanceId= $runInstance | grep InstanceId | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g'
         #echo "Instance ID:" $instanceId
 	publicDns=$(aws ec2 describe-instances --instance-ids $instanceId | grep PublicDns | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
@@ -72,7 +79,7 @@ createVolume() {
 		
 		attachVolume=$(aws ec2 attach-volume --volume-id $volumeId --instance-id $instanceId --device /dev/sdf)
 		echo "attached new volume"
-		mountVolume=$(ssh -oStrictHostKeyChecking=no -i ~/ec2BackUpKeyPair.pem ec2-user@$publicDns 'sudo file -s /dev/sdf | sudo mkfs -t ext4 /dev/sdf | sudo mkdir /data | sudo mount /dev/sdf /data')
+		mountVolume=$(ssh -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns 'sudo file -s /dev/sdf | sudo mkfs -t ext4 /dev/sdf | sudo mkdir /data | sudo mount /dev/sdf /data')
 		echo "Mounted"
 	##If volumen flag has a value, check if it is already attached. If so, echo an error and if not use that volume id to attach and mount
 	else
