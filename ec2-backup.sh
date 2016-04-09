@@ -56,8 +56,8 @@ runInstance() {
         #echo "Instance ID:" $instanceId
 	publicDns=$(aws ec2 describe-instances --instance-ids $instanceId | grep PublicDns | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
 	echo "Public DNS:" $publicDns
-	timeZone=$(aws ec2 describe-instances --instance-ids $instanceId | grep AvailabilityZone | head -1 | awk '{print $2}' | sed 's/\"//g')
-	echo "Time Zone:" $timeZone
+	instanceZone=$(aws ec2 describe-instances --instance-ids $instanceId | grep AvailabilityZone | head -1 | awk '{print $2}' | sed 's/\"//g')
+	echo "Availability Zone:" $instanceZone
 }
 
 createVolume() {
@@ -71,7 +71,7 @@ createVolume() {
         fi
 	
 	##If volume flag value is empty we create a new one and attach
-	if [ "$v"=" " ]; then
+	if [ $v = '' ]; then
 		volumeId=$(aws ec2 create-volume --size $SIZE --availability-zone $timeZone --volume-type standard | grep VolumeId | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
 		echo $volumeId
 		sleep 60
@@ -123,6 +123,39 @@ createBackup()
         fi
 }
 
+volumeID()
+{
+	generateKeyPair
+        runInstance
+      	volumeState=$(aws ec2 describe-volumes --volume-ids $vol | grep State | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
+        echo "$volumeState"
+	#instanceZone=$(aws ec2 describe-instances --instance-ids $instanceId | grep AvailabilityZone | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
+	volumeZone=$(aws ec2 describe-volumes --volume-ids $vol | grep AvailabilityZone | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
+        echo "volumeZone : $volumeZone"
+	if [ $volumeState = 'attached' ]; then
+		echo "Please specify a volume that is available"
+	elif [ $instanceZone != $volumeZone ]; then
+		echo "Please provide a Volume that is in the same zone as the instance : $instanceZone"
+	else
+        	attachVolume=$(aws ec2 attach-volume --volume-id $vol --instance-id $instanceId --device /dev/sdf)
+
+                #       mountVolume=$(ssh -o StrictHostKeyChecking=no -$
+                echo "Attaching Volume"
+		ssh -t -T -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns > /dev/null << EOF
+                sudo mkfs -t ext4 /dev/xvdf
+                sudo mkdir -m 755 /data
+                sudo mount /dev/xvdf /data
+                df -h
+                exit
+EOF
+		m='rsync'
+		createBackup
+        fi
+	
+
+
+}
+
 ##
 ##
 ## Main
@@ -144,8 +177,9 @@ createBackup()
             ;;
         v)
             v=${OPTARG}
-            vol=$3
-	
+            vol=$v
+	    dir=$3
+		volumeID
                 #echo "$v"
                 #echo "$dir"
           ;;
