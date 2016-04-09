@@ -26,7 +26,7 @@
 
 ##
 ##FUNCTIONS
-##
+
 
 generateKeyPair() {
 	if [ -f ~/ec2BackUpKeyPair.pem ]; then
@@ -156,7 +156,6 @@ EOF
 
 }
 
-##
 ##
 ## Main
 ##
