@@ -29,11 +29,11 @@
 ##
 
 generateKeyPair() {
-	if [ -f ~/ec2BackUpKeyPair.pem ]; then
+	if [ -f ec2BackUpKeyPair.pem ]; then
 		echo "Key pair already exists"
 	else
 
-        	aws ec2 create-key-pair --key-name ec2BackUpKeyPair --query 'KeyMaterial' --output text > ~/ec2BackUpKeyPair.pem
+        	aws ec2 create-key-pair --key-name ec2BackUpKeyPair --query 'KeyMaterial' --output text > ec2BackUpKeyPair.pem
 		#chmod 600 /home/ssheth6/ec2BackUpKeyPair.pem
 		groupId=$(aws ec2 create-security-group --group-name ec2-backup-sg --description "EC2 backup tool group" | grep GroupId | head -1 | awk '{print $2}' | sed 's/\"//g')
 	        tmp=$(aws ec2 authorize-security-group-ingress --group-name ec2-backup-sg --protocol tcp --port 22 --cidr 0.0.0.0/0)
@@ -49,7 +49,7 @@ runInstance() {
 	instanceId=$(aws ec2 run-instances --instance-type t2.micro --key ec2BackUpKeyPair --image-id ami-fce3c696 --security-group-ids $groupId | grep InstanceId | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
 	echo "from echo $instanceId"
 	sleep 30
-	chmod 400 ~/ec2BackUpKeyPair.pem
+	chmod 400 ec2BackUpKeyPair.pem
 	#echo "Adding Security Group"
 	#aws ec2 modify-instance-attribute --instance-id $instanceId --groups ec2-backup-sg
 	#instanceId= $runInstance | grep InstanceId | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g'
@@ -71,7 +71,7 @@ createVolume() {
         fi
 	
 	##If volume flag value is empty we create a new one and attach
-	if [ "$v"=" " ]; then
+	if [ $v=" " ]; then
 		volumeId=$(aws ec2 create-volume --size $SIZE --availability-zone $timeZone --volume-type standard | grep VolumeId | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
 		echo $volumeId
 		sleep 60
@@ -81,8 +81,8 @@ createVolume() {
 		ssh -t -T -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns > /dev/null << EOF
 		sudo mkfs -t ext4 /dev/xvdf
 		sudo mkdir -m 755 /data
-		sudo mount /dev/xvdf /data
-		df -h
+                sudo mount /dev/xvdf /data
+                df -h
 		exit
 EOF
 		
@@ -109,15 +109,18 @@ EOF
 
 createBackup()
 {
-        if [ "$m"="rysnc" ];
-                then
+        if [ "$m" == "rysnc" ];
+               then
                 #rsync -az $dir ubuntu@$publicDns:/data
 		#rsync -avz -e 'ssh -i "ec2BackUpKeyPair.pem" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null' $dir ubuntu@$publicDns:/data
 		rsync -avzhe "ssh -o StrictHostKeyChecking=no -i ec2BackUpKeyPair.pem" --rsync-path="sudo rsync" $dir ubuntu@$publicDns:/data/
 
-        elif [ "$m"="dd" ];
+        elif [ "$m" == "dd" ];
 		then
-                dd if=$dir of=$publicDns:/data bs=$CHECK
+               # dd if=$dir of=$publicDns:/data bs=$CHECK
+		tar -cf backup.tar $dir > /dev/null
+		chmod 777 backup.tar
+		dd if=backup.tar | (ssh -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns sudo dd of=/data/backup.tar conv=sync)
 	else
 		echo "Please specify a valid value. Available methods are 'rsync' and 'dd'"
         fi
@@ -134,8 +137,8 @@ createBackup()
         m)
             m=${OPTARG}
             dir=$3
-               # echo $m
-               # echo $dir
+               echo "value of m $m"
+               echo "value of dir $dir"
 		generateKeyPair
 		runInstance
 		createVolume
