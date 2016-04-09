@@ -78,11 +78,12 @@ createVolume() {
 		attachVolume=$(aws ec2 attach-volume --volume-id $volumeId --instance-id $instanceId --device /dev/sdf)
 		echo "attached new volume"
 	#	mountVolume=$(ssh -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns 'sudo mkfs -t ext4 /dev/xvdf | sleep 10 | sudo mkdir -m 755 /data | sudo mount /dev/xvdf /data -t ext4')
-		ssh -t -T -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns > /dev/null << EOF
+		ssh -t -T -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns > /dev/null << EOF
 		sudo mkfs -t ext4 /dev/xvdf
 		sudo mkdir -m 755 /data
 		sudo mount /dev/xvdf /data
 		df -h
+		exit
 EOF
 		
 		echo "Mounted"
@@ -94,8 +95,14 @@ EOF
 			echo "Please specify a volume that is available."
 		else
 			attachVolume=$(aws ec2 attach-volume --volume-id $vol --instance-id $instanceId --device /dev/sdf)
-			mountVolume=$(ssh -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns 'sudo mkfs -t ext4 /dev/xvdf | sudo mkdir -m 755 /data | sudo mount /dev/xvdf /data -t ext4')
-
+		#	mountVolume=$(ssh -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns 'sudo mkfs -t ext4 /dev/xvdf | sudo mkdir -m 755 /data | sudo mount /dev/xvdf /data -t ext4')
+			ssh -t -T -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns > /dev/null << EOF
+                sudo mkfs -t ext4 /dev/xvdf
+                sudo mkdir -m 755 /data
+                sudo mount /dev/xvdf /data
+                df -h
+                exit
+EOF
 		fi
 	fi
 }
@@ -104,7 +111,10 @@ createBackup()
 {
         if [ "$m"="rysnc" ];
                 then
-                rsync -az $dir unbuntu@$publicDns:/data
+                #rsync -az $dir ubuntu@$publicDns:/data
+		#rsync -avz -e 'ssh -i "ec2BackUpKeyPair.pem" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null' $dir ubuntu@$publicDns:/data
+		rsync -avzhe "ssh -o StrictHostKeyChecking=no -i ec2BackUpKeyPair.pem" --rsync-path="sudo rsync" $dir ubuntu@$publicDns:/data/
+
         elif [ "$m"="dd" ];
 		then
                 dd if=$dir of=$publicDns:/data bs=$CHECK
