@@ -148,7 +148,7 @@ volumeID()
                 df -h
                 exit
 EOF
-		m='rsync'
+		m='dd'
 		createBackup
         fi
 	
