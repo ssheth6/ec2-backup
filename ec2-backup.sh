@@ -3,25 +3,40 @@
 ##
 ##FUNCTIONS
 
+flags_aws=''
+flags_ssh=''
 
 generateKeyPair() {
 	echo "Kepy PAir Fun"
-	if [ -f ec2BackUpKeyPair.pem ]; then
-		echo "Key pair already exists"
-	else
+        
+		if [ -f ec2BackUpKeyPair.pem ]; then
+			echo "Key pair already exists"
+		else
 
-        	aws ec2 create-key-pair --key-name ec2BackUpKeyPair --query 'KeyMaterial' --output text > ec2BackUpKeyPair.pem
+        		aws ec2 create-key-pair --key-name ec2BackUpKeyPair --query 'KeyMaterial' --output text > ec2BackUpKeyPair.pem
 	
-		groupId=$(aws ec2 create-security-group --group-name ec2-backup-sg --description "EC2 backup tool group" | grep GroupId | head -1 | awk '{print $2}' | sed 's/\"//g')
-	        tmp=$(aws ec2 authorize-security-group-ingress --group-name ec2-backup-sg --protocol tcp --port 22 --cidr 0.0.0.0/0)
-		echo "Key pair created"
-	fi
+			groupId=$(aws ec2 create-security-group --group-name ec2-backup-sg --description "EC2 backup tool group" | grep GroupId | head -1 | awk '{print $2}' | sed 's/\"//g')
+	        	tmp=$(aws ec2 authorize-security-group-ingress --group-name ec2-backup-sg --protocol tcp --port 22 --cidr 0.0.0.0/0)
+			echo "Key pair created"
+		fi
+	#fi
 }
 
 runInstance() {
 	echo "run Instamce Fun"
-	groupId=$(aws ec2 describe-security-groups --group-names ec2-backup-sg | grep GroupId | head -1 | awk '{print $2}' | sed 's/\"//g')
-	instanceId=$(aws ec2 run-instances --instance-type t2.micro --key ec2BackUpKeyPair --image-id ami-fce3c696 --security-group-ids $groupId | grep InstanceId | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
+	echo "`echo "$EC2_BACKUP_FLAGS_AWS"`"
+        if [ -n "`echo "$EC2_BACKUP_FLAGS_AWS"`" ]
+        then
+                flags_aws="`echo $EC2_BACKUP_FLAGS_AWS`"
+		echo "from if loop $flags_aws"
+		groupId=$(aws ec2 describe-security-groups --group-names ec2-backup-sg | grep GroupId | head -1 | awk '{print $2}' | sed 's/\"//g')
+        	instanceId=$(aws ec2 run-instances $flags_aws --key ec2BackUpKeyPair --image-id ami-d9dd0eb0 --security-group-ids $groupId | grep InstanceId | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
+        else
+                flags_aws="--instance-type t2.micro"
+                echo "from else loop $flags_aws"
+		groupId=$(aws ec2 describe-security-groups --group-names ec2-backup-sg | grep GroupId | head -1 | awk '{print $2}' | sed 's/\"//g')
+        	instanceId=$(aws ec2 run-instances $flags_aws --key ec2BackUpKeyPair --image-id ami-fce3c696 --security-group-ids $groupId | grep InstanceId | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
+        fi
 	echo "from echo $instanceId"
 	sleep 30
 	chmod 400 ec2BackUpKeyPair.pem
@@ -93,14 +108,7 @@ createBackup()
                 #tar -cf backup_$timeStamp.tar $dir > /dev/null 2>&1
                 echo "Before dd cmd execution"
 		tar -cf - $dir | ssh -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns "sudo dd of=/data/dir.tar" conv=sync
-		#tar -cf backup_$timeStamp.tar $dir | ssh -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns "sudo dd of=/data/$dir.tar" conv=sync
-		#dd if=backup_$timeStamp.tar | (ssh -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns "sudo dd of=/data/backup_$timeStamp.tar" conv=sync)
        		echo "After DD"
-	 #elif [ "$opt_m" == "" ]; 
-	#then 
-	#	timeStamp=$(date "+%Y.%m.%d-%H")
-        #        tar -cf backup_$timeStamp.tar $dir > /dev/null 2>&1
-        #        dd if=backup_$timeStamp.tar | (ssh -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns sudo dd of=/data/backup_$timeStamp.tar conv=sync)
 
 	else
                 echo "Please specify a valid value. Available methods are 'rsync' and 'dd'"
