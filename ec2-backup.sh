@@ -5,6 +5,7 @@
 
 
 generateKeyPair() {
+	echo "Kepy PAir Fun"
 	if [ -f ec2BackUpKeyPair.pem ]; then
 		echo "Key pair already exists"
 	else
@@ -18,7 +19,7 @@ generateKeyPair() {
 }
 
 runInstance() {
-
+	echo "run Instamce Fun"
 	groupId=$(aws ec2 describe-security-groups --group-names ec2-backup-sg | grep GroupId | head -1 | awk '{print $2}' | sed 's/\"//g')
 	instanceId=$(aws ec2 run-instances --instance-type t2.micro --key ec2BackUpKeyPair --image-id ami-fce3c696 --security-group-ids $groupId | grep InstanceId | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
 	echo "from echo $instanceId"
@@ -31,6 +32,7 @@ runInstance() {
 }
 
 createVolume() {
+	echo "Create Volume Fun"
 
         CHECK=$(du -ms $dir | cut -f1)
         if [ $CHECK -lt 1000 ]; then
@@ -79,7 +81,8 @@ EOF
 
 createBackup()
 {
-        if [ "$opt_m" == "rsync" ];
+        echo "Create Backup"
+	if [ "$opt_m" == "rsync" ];
                then
                   rsync -avzhe "ssh -o StrictHostKeyChecking=no -i ec2BackUpKeyPair.pem" --rsync-path="sudo rsync" $dir ubuntu@$publicDns:/data/
 
@@ -87,9 +90,13 @@ createBackup()
                 then
                
                 timeStamp=$(date "+%Y.%m.%d-%H")
-                tar -cf backup_$timeStamp.tar $dir > /dev/null 2>&1
-                dd if=backup_$timeStamp.tar | (ssh -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns sudo dd of=/data/backup_$timeStamp.tar conv=sync)
-        #elif [ "$opt_m" == "" ]; 
+                #tar -cf backup_$timeStamp.tar $dir > /dev/null 2>&1
+                echo "Before dd cmd execution"
+		tar -cf - $dir | ssh -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns "sudo dd of=/data/dir.tar" conv=sync
+		#tar -cf backup_$timeStamp.tar $dir | ssh -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns "sudo dd of=/data/$dir.tar" conv=sync
+		#dd if=backup_$timeStamp.tar | (ssh -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns "sudo dd of=/data/backup_$timeStamp.tar" conv=sync)
+       		echo "After DD"
+	 #elif [ "$opt_m" == "" ]; 
 	#then 
 	#	timeStamp=$(date "+%Y.%m.%d-%H")
         #        tar -cf backup_$timeStamp.tar $dir > /dev/null 2>&1
@@ -102,6 +109,7 @@ createBackup()
 
 volumeID()
 {
+	echo "Volume ID Fun"
 	generateKeyPair
         runInstance
       	volumeState=$(aws ec2 describe-volumes --volume-ids $vol | grep State | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
@@ -110,8 +118,10 @@ volumeID()
         echo "volumeZone : $volumeZone"
 	if [ $volumeState = 'attached' ]; then
 		echo "Please specify a volume that is available"
+		exit 1
 	elif [ $instanceZone != $volumeZone ]; then
 		echo "Please provide a Volume that is in the same zone as the instance : $instanceZone"
+		exit 1
 	else
         	echo "Waiting to be attached"
 		sleep 60
@@ -138,14 +148,16 @@ EOF
 ## Main
 ##
 ##
+opt_m=""
+opt_v=""
 
   while getopts ":hm:v:" o; do
     case "${o}" in
         m)
             opt_m=${OPTARG}
             dir=$3
-               # echo $m
-               # echo $dir
+            echo $opt_m
+            echo $dir
 		#generateKeyPair
 		#runInstance
 		#createVolume
@@ -165,22 +177,28 @@ EOF
             echo "Usage: $0 [-m type of backup] [-v volume-id ]"
             ;;
     esac done
-   if [ "$opt_m" == "" ] && [ "opt_v" != "" ]; then
+
+   if [[ "$opt_m" == "" && "$opt_v" != "" ]]; then
+	echo "1"
 	opt_m="dd"
 	volumeID
 	createBackup
-   elif [ "$opt_m" != "" ] && [ "opt_v" == "" ]; then
+   elif [[ "$opt_m" != "" && "$opt_v" == "" ]]; then
+	echo "2"
 	generateKeyPair
         runInstance
         createVolume
         createBackup
-   elif [ "$opt_m" != "" ] && [ "opt_v" == "" ]; then
+   elif [[ "$opt_m" == "" && "$opt_v" == "" ]]; then
+	echo "3"
 	opt_m="dd"
 	generateKeyPair
         runInstance
         createVolume
         createBackup
-   elif [ "$opt_m" != "" ] && [ "opt_v" != "" ]; then 
+   elif [[ "$opt_m" != "" && "$opt_v" != "" ]]; then 
+	echo "4"
+	echo "$opt_v $opt_m"
 	volumeID
         createBackup
   else
