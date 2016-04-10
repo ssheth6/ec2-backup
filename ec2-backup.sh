@@ -41,7 +41,7 @@ createVolume() {
         fi
 	
 	##If volume flag value is empty we create a new one and attach
-	if [ "$v" == "" ]; then
+	if [ "$opt_v" == "" ]; then
 		volumeId=$(aws ec2 create-volume --size $SIZE --availability-zone $instanceZone --volume-type standard | grep VolumeId | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
 		echo $volumeId
 		sleep 60
@@ -79,23 +79,17 @@ EOF
 
 createBackup()
 {
-        if [ "$m" == "" ];
-        then
-               timeStamp=$(date "+%Y.%m.%d-%H")
-                tar -cf backup_$timeStamp.tar $dir > /dev/null 2>&1
-                dd if=backup_$timeStamp.tar | (ssh -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns sudo dd of=/data/backup_$timeStamp.tar conv=sync)
-
-	elif [ "$m" == "rsync" ];
+        if [ "$opt_m" == "rsync" ];
                then
                   rsync -avzhe "ssh -o StrictHostKeyChecking=no -i ec2BackUpKeyPair.pem" --rsync-path="sudo rsync" $dir ubuntu@$publicDns:/data/
 
-        elif [ "$m" == "dd" ];
+        elif [ "$opt_m" == "dd" ];
                 then
                
                 timeStamp=$(date "+%Y.%m.%d-%H")
                 tar -cf backup_$timeStamp.tar $dir > /dev/null 2>&1
                 dd if=backup_$timeStamp.tar | (ssh -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns sudo dd of=/data/backup_$timeStamp.tar conv=sync)
-        #elif [ "$m" == "" ]; 
+        #elif [ "$opt_m" == "" ]; 
 	#then 
 	#	timeStamp=$(date "+%Y.%m.%d-%H")
         #        tar -cf backup_$timeStamp.tar $dir > /dev/null 2>&1
@@ -134,9 +128,7 @@ EOF
                 echo "Mounted"
 		
 
-		#m='dd'
-		#createBackup
-        fi
+	 fi
 	
 
 
@@ -150,22 +142,22 @@ EOF
   while getopts ":hm:v:" o; do
     case "${o}" in
         m)
-            m=${OPTARG}
+            opt_m=${OPTARG}
             dir=$3
                # echo $m
                # echo $dir
-		generateKeyPair
-		runInstance
-		createVolume
-		createBackup
+		#generateKeyPair
+		#runInstance
+		#createVolume
+		#createBackup
 		
             ;;
         v)
-            v=${OPTARG}
-            vol=$v
+            opt_v=${OPTARG}
+            vol=$opt_v
 	    dir=$3
-		volumeID
-		createBackup
+		#volumeID
+		#createBackup
                 #echo "$v"
                 #echo "$dir"
           ;;
@@ -173,6 +165,27 @@ EOF
             echo "Usage: $0 [-m type of backup] [-v volume-id ]"
             ;;
     esac done
+   if [ "$opt_m" == "" ] && [ "opt_v" != "" ]; then
+	opt_m="dd"
+	volumeID
+	createBackup
+   elif [ "$opt_m" != "" ] && [ "opt_v" == "" ]; then
+	generateKeyPair
+        runInstance
+        createVolume
+        createBackup
+   elif [ "$opt_m" != "" ] && [ "opt_v" == "" ]; then
+	opt_m="dd"
+	generateKeyPair
+        runInstance
+        createVolume
+        createBackup
+   elif [ "$opt_m" != "" ] && [ "opt_v" != "" ]; then 
+	volumeID
+        createBackup
+  else
+	echo "Error"
+  fi 
 
 ###end of case statement
 
