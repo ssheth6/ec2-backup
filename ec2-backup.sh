@@ -118,9 +118,9 @@ createBackup()
         elif [ "$m" == "dd" ];
 		then
                # dd if=$dir of=$publicDns:/data bs=$CHECK
-		tar -cf backup.tar $dir > /dev/null
-		chmod 777 backup.tar
-		dd if=backup.tar | (ssh -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns sudo dd of=/data/backup.tar conv=sync)
+		timeStamp=$(date "+%Y.%m.%d-%H")
+		tar -cf backup_$timeStamp.tar $dir > /dev/null 2>&1
+		dd if=backup_$timeStamp.tar | (ssh -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns sudo dd of=/data/backup_$timeStamp.tar conv=sync)
 	else
 		echo "Please specify a valid value. Available methods are 'rsync' and 'dd'"
         fi
@@ -137,8 +137,6 @@ createBackup()
         m)
             m=${OPTARG}
             dir=$3
-               echo "value of m $m"
-               echo "value of dir $dir"
 		generateKeyPair
 		runInstance
 		createVolume
