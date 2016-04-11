@@ -13,8 +13,18 @@
 
 flags_aws=''
 flags_ssh=''
-#Print out parameter if verbose eq true
-EC2_BACKUP_VERBOSE='false'
+verbose=false
+
+# echo >&2 message text...
+# > redirect standard output
+# & what comes next is a file descriptor, not a file (only for right hand side of >
+# this links the command's stdout to the current stderr
+verbose() {
+  if [[ ! -z $EC2_BACKUP_VERBOSE ]]; 
+  	then
+    	echo $@ >&2
+  fi
+}
 
 generateKeyPair() {
 
@@ -30,10 +40,10 @@ generateKeyPair() {
 		else
 			groupName="ec2-backup"
 			checkGroup=$(aws ec2 describe-security-groups --group-names $groupName | grep GroupName | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g') 1>/dev/null 2>/dev/null
-				[ $EC2_BACKUP_VERBOSE = 'true' ] && echo "Your Group Name is $groupName"	
+				verbose "Your Group Name is $groupName"	
 			if [ "$checkGroup" == "" ];
 			then
-				[ $EC2_BACKUP_VERBOSE = 'true' ] && echo "Currently checking Security Group..."
+				verbose "Currently checking Security Group..."
 				groupId=$(aws ec2 create-security-group --group-name $groupName --description "EC2 backup tool group" | grep GroupId | head -1 | awk '{print $2}' | sed 's/\"//g')
                         	tmp=$(aws ec2 authorize-security-group-ingress --group-name $groupName --protocol tcp --port 22 --cidr 0.0.0.0/0)
                 	fi
@@ -41,7 +51,7 @@ generateKeyPair() {
 	else
 	# Check if a key pair already exisit and use the existing instead of creating a new on the fly			       
 		if [ -f ec2BackUpKeyPair ]; then
-			[ $EC2_BACKUP_VERBOSE = 'true' ] && echo "Key pair already exists"
+			verbose "Key pair already exists"
 			groupName="ec2-backup-sg"
 			key_path="ec2BackUpKeyPair"
                         key_name="ec2BackUpKeyPair"
@@ -82,8 +92,8 @@ runInstance() {
         fi
 	
 		# Sleep is required here. Spinning up the Instance takes a bit of time to become visible.
-		[ $EC2_BACKUP_VERBOSE = 'true' ] && echo 'Instance creation currently in process'
-		[ $EC2_BACKUP_VERBOSE = 'true' ] && echo 'Waiting...'
+		verbose 'Instance creation currently in process'
+		verbose 'Waiting...'
 			sleep 30
 			
 			# Change access permissions of generated key pair 
@@ -110,12 +120,12 @@ createVolume() {
 			volumeId=$(aws ec2 create-volume --size $SIZE --availability-zone $instanceZone --volume-type standard | grep VolumeId | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
 				echo "$volumeId"
 				# Sleep here is required as it takes a bit of time (1min) for the volume to become visible
-				[ $EC2_BACKUP_VERBOSE = 'true' ] && echo "Volume $volumeId created, please wait 1 min"
-				[ $EC2_BACKUP_VERBOSE = 'true' ] && echo "Waiting..."
+				verbose "Volume $volumeId created, please wait 1 min"
+				verbose "Waiting..."
 					sleep 60
 
 			attachVolume=$(aws ec2 attach-volume --volume-id $volumeId --instance-id $instanceId --device /dev/sdf)
-				[ $EC2_BACKUP_VERBOSE = 'true' ] && echo "New Volume $volumeId has been attached"
+				verbose "New Volume $volumeId has been attached"
 	
 		# SSH on Remote Host
 		# Create the Filesystem
@@ -134,10 +144,10 @@ EOF
 	#If volume flag has a value, check if it is already attached. If so, echo an error and if not use that volume id to attach and mount
 	else
         	volumeState=$(aws ec2 describe-volumes --volume-ids $vol | grep State | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
-				[ $EC2_BACKUP_VERBOSE = 'true' ] && echo "Current Volume: $volumeState"
+				verbose "Current Volume: $volumeState"
 
 		if [ "$volumeState"="attached" ]; then
-			[ $EC2_BACKUP_VERBOSE = 'true' ] && echo "Error: Please specify a volume that is available."
+			verbose "Error: Please specify a volume that is available."
 
 		else
 			attachVolume=$(aws ec2 attach-volume --volume-id $vol --instance-id $instanceId --device /dev/sdf)
@@ -162,7 +172,7 @@ EOF
 #
 createBackup()
 {
-    [ $EC2_BACKUP_VERBOSE = 'true' ] && echo "Create Backup"
+    verbose "Create Backup"
 	if [ "$opt_m" == "rsync" ];
                then
                   rsync -avzhe "ssh -o StrictHostKeyChecking=no -i $key_path" --rsync-path="sudo rsync" $dir ubuntu@$publicDns:/data/ 1>/dev/null 2>/dev/null
@@ -225,7 +235,7 @@ volumeID()
             exit
 EOF
 
-                [ $EC2_BACKUP_VERBOSE = 'true' ] && echo "Volume has been Mounted"
+                verbose "Volume has been Mounted"
 		
 
 	 fi
@@ -239,11 +249,11 @@ EOF
 terminateInstance()
 {
 	if [ "$instanceId" == "" ]; then 
-		[ $EC2_BACKUP_VERBOSE = 'true' ] && echo "No instance was created"
+		verbose "No instance was created"
 	else
 		aws ec2 stop-instances --instance-ids $instanceId 1>/dev/null 2>/dev/null
 		aws ec2 terminate-instances --instance-ids $instanceId 1>/dev/null 2>/dev/null
-		[ $EC2_BACKUP_VERBOSE = 'true' ] && echo "Instacnes have been terminated"
+		verbose "Instacnes have been terminated"
 	fi 
 }
 
