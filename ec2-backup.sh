@@ -10,8 +10,7 @@ EC2_BACKUP_VERBOSE='false'
 
 generateKeyPair() {
 
-echo "Generating Key Pair"
-        
+		       
 		if [ -f ec2BackUpKeyPair.pem ]; then
 			echo "Key pair already exists"
 		else
@@ -152,20 +151,31 @@ createBackup()
 
 volumeID()
 {
+	
 	echo "Volume ID Fun"
 	generateKeyPair
         runInstance
-      	volumeState=$(aws ec2 describe-volumes --volume-ids $vol | grep State | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
+      	#aws ec2 describe-volumes --volume-id $vol 1>/dev/null 2>/dev/null
+        #if [ $? -ne 0 ];
+        #then
+        #        echo "The volume $vol doesn't exist"
+        #        terminateInstance
+#		exit 1
+#        fi
+
+	volumeState=$(aws ec2 describe-volumes --volume-ids $opt_v | grep State | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
         	[ $EC2_BACKUP_VERBOSE = 'true' ] &&  echo "$volumeState"
-		volumeZone=$(aws ec2 describe-volumes --volume-ids $vol | grep AvailabilityZone | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
+		volumeZone=$(aws ec2 describe-volumes --volume-ids $opt_v | grep AvailabilityZone | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
         	[ $EC2_BACKUP_VERBOSE = 'true' ] &&  echo "volumeZone : $volumeZone"
 	
-	if [ $volumeState = 'attached' ]; then
-			echo "Please specify a volume that is available"
+	if [ "$volumeState" == "attached" ]; then
+		echo "The volume $opt_v provided is attached"
+		terminateInstance
 		exit 1
 	
-	elif [ $instanceZone != $volumeZone ]; then
-			echo "Please provide a Volume that is in the same zone as the instance : $instanceZone"
+	elif [ "$instanceZone" != "$volumeZone" ]; then
+		echo "The volume $opt_v is  not in the same availability zone as the instance"
+		terminateInstance
 		exit 1
 	
 	else
@@ -174,7 +184,7 @@ volumeID()
         	[ $EC2_BACKUP_VERBOSE = 'true' ] &&  echo "Waiting..."
 				sleep 60
 				
-			attachVolume=$(aws ec2 attach-volume --volume-id $vol --instance-id $instanceId --device /dev/sdf)
+			attachVolume=$(aws ec2 attach-volume --volume-id $opt_v --instance-id $instanceId --device /dev/sdf)
                 [ $EC2_BACKUP_VERBOSE = 'true' ] &&  echo "Attaching Volume"
             
             # SSH on Remote Host
@@ -186,7 +196,7 @@ volumeID()
             sudo mkdir -m 755 /data
             sudo mount /dev/xvdf /data
             df -h
-                exit
+            exit
 EOF
 
                 [ $EC2_BACKUP_VERBOSE = 'true' ] && echo "Volume has been Mounted"
@@ -196,39 +206,109 @@ EOF
 	
 }
 
+terminateInstance()
+{
+	if [ "$instanceId" == "" ]; then 
+		[ $EC2_BACKUP_VERBOSE = 'true' ] && echo "No instance was created"
+	else
+		aws ec2 stop-instances --instance-ids $instanceId 1>/dev/null 2>/dev/null
+		aws ec2 terminate-instances --instance-ids $instanceId 1>/dev/null 2>/dev/null
+		[ $EC2_BACKUP_VERBOSE = 'true' ] && echo "Instacnes have been terminated"
+	fi 
+}
+
+
+function ctrl_c() {
+  
+      terminateInstance
+	exit 1
+}
+
+displayHelp()
+{
+	echo "
+
+	SYNOPSIS:
+	ec2-backup [-h] [-m method] [-v volume-id] dir 
+
+	DESCRIPTION:
+	ec2-backup accepts the following command-line flags:
+
+	-h	 	   Print a usage statement and exit.
+
+     	-m method	   Use the given method to perform the backup.	Valid methods
+			   are 'dd' and 'rsync'; default is 'dd'.
+
+     	-v volume-id	   Use the given volume instead of creating a new one.
+	"
+	exit 1
+}
+
 ##
 ## Main
 ##
 ##
 opt_m=""
 opt_v=""
+trap ctrl_c INT
 
-  while getopts ":hm:v:" o; do
-    case "${o}" in
-        m)
-            opt_m=${OPTARG}
-            dir=$3
-            echo $opt_m
-            echo $dir
+while [ $# -gt 0 ] 
+do
+	case $1 in
+		-h) displayHelp;;
+		-m) 
+			case $2 in
+			dd) opt_m="$2"; echo " m : $opt_m"; shift; shift;;
+			rsync) opt_m="$2"; echo "m : $opt_m"; shift; shift;;
+			-*) echo "Invalid Parameter"; exit 1;;
+			*) echo "Please specify a valid value. Available methods are 'rsync' and 'dd'"; exit 1;;
+			esac
+			;;
+		-v) 
+			case $2 in
+			vol-*) opt_v="$2";  shift; shift;;
+			-*) echo "No volume ID was provided"; exit 1;;
+			*) echo "No volume ID was provided"; exit 1;;
+			esac
+			;;
+		-*) displayHelp;;
+		 *) 
+		 	if [ $# -gt 1 ] 
+		 	then
+		 		echo "Specify the directory at the end"; displayHelp
+		 	else
+		 		echo "$1"
+				dir=$1; shift
+		 	fi
+		 	;;
+	esac
+done
+  #while getopts ":hm:v:" o; do
+   # case "${o}" in
+    #    m)
+     #       opt_m=${OPTARG}
+      #      dir=$3
+       #     echo $opt_m
+        #    echo $dir
 		#generateKeyPair
 		#runInstance
 		#createVolume
 		#createBackup
 		
-            ;;
-        v)
-            opt_v=${OPTARG}
-            vol=$opt_v
-	    dir=$3
+         #   ;;
+        #v)
+         #   opt_v=${OPTARG}
+         #   vol=$opt_v
+	  #  dir=$3
 		#volumeID
 		#createBackup
                 #echo "$v"
                 #echo "$dir"
-          ;;
-        h)
-            echo "Usage: $0 [-m type of backup] [-v volume-id ]"
-            ;;
-    esac done
+         # ;;
+       # h)
+        #    echo "Usage: $0 [-m type of backup] [-v volume-id ]"
+         #   ;;
+    #esac done
 
    if [[ "$opt_m" == "" && "$opt_v" != "" ]]; then
 	echo "1"
