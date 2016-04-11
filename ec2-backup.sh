@@ -13,19 +13,15 @@ generateKeyPair() {
 	if [ -n "`echo "$EC2_BACKUP_FLAGS_SSH"`" ]
                 then
                 flags_ssh="`echo $EC2_BACKUP_FLAGS_SSH`"
-                echo "form if loop $flags_ssh"
                 key_path=$(echo $flags_ssh | awk '{print $2}')
                 key_name=$(echo $key_path | awk -F "/" '{print ($NF)}')
-                echo "from if loop $key_path"
-                echo "from if loop $key_name"
                 if [ ! -e "$key_path" ]
                 then
                         echo "The key file does not exist."
                         exit 1
 		else
 			groupName="ec2-backup"
-			checkGroup=$(aws ec2 describe-security-groups --group-names $groupName | grep GroupName | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')	
-
+			checkGroup=$(aws ec2 describe-security-groups --group-names $groupName | grep GroupName | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g') 1>/dev/null 2>/dev/null	
 			if [ "$checkGroup" == "" ];
 			then
 				groupId=$(aws ec2 create-security-group --group-name $groupName --description "EC2 backup tool group" | grep GroupId | head -1 | awk '{print $2}' | sed 's/\"//g')
@@ -34,7 +30,10 @@ generateKeyPair() {
 		fi
 	else			       
 		if [ -f ec2BackUpKeyPair ]; then
-			echo "Key pair already exists"
+			[ $EC2_BACKUP_VERBOSE = 'true' ] && echo "Key pair already exists"
+			groupName="ec2-backup-sg"
+			key_path="ec2BackUpKeyPair"
+                        key_name="ec2BackUpKeyPair"
 		else
 				# Generate a Key Pair and output to users directory where script is executed
 				# Generate a Security Group and authorize all IPs via port 22
@@ -57,23 +56,18 @@ generateKeyPair() {
 # If using the user input, will be forcing a 't1.micro' for AMI - ami-d9dd0eb0
 # The Else statement will take a t2.micro for a different AMI - ami-fce3c696
 runInstance() {
-	echo "run Instance Fun"
 	[ $EC2_BACKUP_VERBOSE = 'true' ] &&  echo "`echo "$EC2_BACKUP_FLAGS_AWS"`"
         if [ -n "`echo "$EC2_BACKUP_FLAGS_AWS"`" ]
         	then
-                flags_aws="`echo $EC2_BACKUP_FLAGS_AWS`"
-					echo "from if loop $flags_aws"
-				groupId=$(aws ec2 describe-security-groups --group-names $groupName | grep GroupId | head -1 | awk '{print $2}' | sed 's/\"//g')
+                	flags_aws="`echo $EC2_BACKUP_FLAGS_AWS`"
+			groupId=$(aws ec2 describe-security-groups --group-names $groupName | grep GroupId | head -1 | awk '{print $2}' | sed 's/\"//g')
         		instanceId=$(aws ec2 run-instances $flags_aws --key $key_name --image-id ami-d9dd0eb0 --security-group-ids $groupId | grep InstanceId | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
         else
-                flags_aws="--instance-type t2.micro"
-                	echo "from else loop $flags_aws"
-				groupId=$(aws ec2 describe-security-groups --group-names $groupName | grep GroupId | head -1 | awk '{print $2}' | sed 's/\"//g')
+                	flags_aws="--instance-type t2.micro"
+			groupId=$(aws ec2 describe-security-groups --group-names $groupName | grep GroupId | head -1 | awk '{print $2}' | sed 's/\"//g')
         		instanceId=$(aws ec2 run-instances $flags_aws --key $key_name --image-id ami-fce3c696 --security-group-ids $groupId | grep InstanceId | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
         fi
 	
-	echo "from echo $instanceId"
-
 		# Sleep is required here. Spinning up the Instance takes a bit of time to become visible.
 		[ $EC2_BACKUP_VERBOSE = 'true' ] && echo 'Instance creation currently in process'
 		[ $EC2_BACKUP_VERBOSE = 'true' ] && echo 'Waiting...'
@@ -88,7 +82,6 @@ runInstance() {
 }
 
 createVolume() {
-	echo "Create Volume Fun"
 
 		# Checks the size of the given dir ($dir) and will be used for the create-volume Variable to create volume double the size of the "CHECK"ed directory
         CHECK=$(du -ms $dir | cut -f1)
@@ -102,7 +95,7 @@ createVolume() {
 	##If volume flag value is empty we create a new one and attach
 	if [ "$opt_v" == "" ]; then
 		volumeId=$(aws ec2 create-volume --size $SIZE --availability-zone $instanceZone --volume-type standard | grep VolumeId | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
-			
+			echo "$volumeId"
 			# Sleep here is required as it takes a bit of time (1min) for the volume to become visible
 			[ $EC2_BACKUP_VERBOSE = 'true' ] && echo "Volume $volumeId created, please wait 1 min"
 			[ $EC2_BACKUP_VERBOSE = 'true' ] && echo "Waiting..."
@@ -115,8 +108,8 @@ createVolume() {
 		# Create the Filesystem
 		# Make and Mount Directory
 		# Assumes user has "Sudo" permissions available
-		ssh -t -T -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "$key_path" ubuntu@$publicDns > /dev/null << EOF
-		sudo mkfs -t ext4 /dev/xvdf
+		ssh -t -T -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "$key_path" ubuntu@$publicDns 1>/dev/null 2>/dev/null << EOF
+		sudo mkfs -t ext4 /dev/xvdf 1>/dev/null 2>/dev/null
 		sudo mkdir -m 755 /data
 		sudo mount /dev/xvdf /data
 		df -h
@@ -135,14 +128,13 @@ EOF
 
 		else
 			attachVolume=$(aws ec2 attach-volume --volume-id $vol --instance-id $instanceId --device /dev/sdf)
-		#	mountVolume=$(ssh -o StrictHostKeyChecking=no -i "ec2BackUpKeyPair.pem" ubuntu@$publicDns 'sudo mkfs -t ext4 /dev/xvdf | sudo mkdir -m 755 /data | sudo mount /dev/xvdf /data -t ext4')
 					
 			# SSH on Remote Host
 			# Create the Filesystem
 			# Make and Mount Directory
 			# Assumes user has "Sudo" permissions available
-			ssh -t -T -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "$key_path" ubuntu@$publicDns > /dev/null << EOF
-                sudo mkfs -t ext4 /dev/xvdf
+			ssh -t -T -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "$key_path" ubuntu@$publicDns 1>/dev/null 2>/dev/null << EOF
+                sudo mkfs -t ext4 /dev/xvdf 1>/dev/null 2>/dev/null
                 sudo mkdir -m 755 /data
                 sudo mount /dev/xvdf /data
                 df -h
@@ -160,16 +152,13 @@ createBackup()
     [ $EC2_BACKUP_VERBOSE = 'true' ] && echo "Create Backup"
 	if [ "$opt_m" == "rsync" ];
                then
-                  rsync -avzhe "ssh -o StrictHostKeyChecking=no -i $key_path" --rsync-path="sudo rsync" $dir ubuntu@$publicDns:/data/
+                  rsync -avzhe "ssh -o StrictHostKeyChecking=no -i $key_path" --rsync-path="sudo rsync" $dir ubuntu@$publicDns:/data/ 1>/dev/null 2>/dev/null
 
         elif [ "$opt_m" == "dd" ];
                 then      
                 	timeStamp=$(date "+%Y.%m.%d-%H")
-                #tar -cf backup_$timeStamp.tar $dir > /dev/null 2>&1
-                	echo "Before dd cmd execution"
                 	# Create tar on local host
-					tar -cf - $dir | ssh -o StrictHostKeyChecking=no -i "$key_path" ubuntu@$publicDns "sudo dd of=/data/dir.tar" conv=sync
-       				echo "After DD"
+			tar -cf - $dir 1>/dev/null 2>/dev/null | ssh -o StrictHostKeyChecking=no -i "$key_path" ubuntu@$publicDns "sudo dd of=/data/dir.tar" conv=sync 1>/dev/null 2>/dev/null
 	else
                 echo " Please specify a valid value. Available methods are 'rsync' and 'dd' "
         fi
@@ -177,17 +166,8 @@ createBackup()
 
 volumeID()
 {
-	
-	echo "Volume ID Fun"
 	generateKeyPair
         runInstance
-      	#aws ec2 describe-volumes --volume-id $vol 1>/dev/null 2>/dev/null
-        #if [ $? -ne 0 ];
-        #then
-        #        echo "The volume $vol doesn't exist"
-        #        terminateInstance
-#		exit 1
-#        fi
 
 	volumeState=$(aws ec2 describe-volumes --volume-ids $opt_v | grep State | head -1 | awk '{print $2}' | sed 's/\"//g' | sed 's/\,//g')
         	[ $EC2_BACKUP_VERBOSE = 'true' ] &&  echo "$volumeState"
@@ -217,8 +197,8 @@ volumeID()
 			# Create the Filesystem
 			# Make and Mount Directory
 			# Assumes user has "Sudo" permissions available
-            ssh -t -T -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "$key_path" ubuntu@$publicDns > /dev/null << EOF
-            sudo mkfs -t ext4 /dev/xvdf
+            ssh -t -T -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "$key_path" ubuntu@$publicDns 1>/dev/null 2>/dev/null << EOF
+            sudo mkfs -t ext4 /dev/xvdf 1>/dev/null 2>/dev/null
             sudo mkdir -m 755 /data
             sudo mount /dev/xvdf /data
             df -h
@@ -284,8 +264,8 @@ do
 		-h) displayHelp;;
 		-m) 
 			case $2 in
-			dd) opt_m="$2"; echo " m : $opt_m"; shift; shift;;
-			rsync) opt_m="$2"; echo "m : $opt_m"; shift; shift;;
+			dd) opt_m="$2"; shift; shift;;
+			rsync) opt_m="$2"; shift; shift;;
 			-*) echo "Invalid Parameter"; exit 1;;
 			*) echo "Please specify a valid value. Available methods are 'rsync' and 'dd'"; exit 1;;
 			esac
@@ -303,7 +283,6 @@ do
 		 	then
 		 		echo "Specify the directory at the end"; displayHelp
 		 	else
-		 		echo "$1"
 				dir=$1; shift
 		 	fi
 		 	;;
@@ -311,20 +290,17 @@ do
 done
 
    if [[ "$opt_m" == "" && "$opt_v" != "" ]]; then
-	echo "1"
 	opt_m="dd"
 	volumeID
 	createBackup
 	terminateInstance
    elif [[ "$opt_m" != "" && "$opt_v" == "" ]]; then
-	echo "2"
 	generateKeyPair
         runInstance
         createVolume
         createBackup
 	terminateInstance
    elif [[ "$opt_m" == "" && "$opt_v" == "" ]]; then
-	echo "3"
 	opt_m="dd"
 	generateKeyPair
         runInstance
@@ -332,8 +308,6 @@ done
         createBackup
 	terminateInstance
    elif [[ "$opt_m" != "" && "$opt_v" != "" ]]; then 
-	echo "4"
-	echo "$opt_v $opt_m"
 	volumeID
         createBackup
 	terminateInstance
