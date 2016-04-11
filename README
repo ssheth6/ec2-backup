@@ -125,6 +125,16 @@ CONSIDERATIONS:
         1) If a flag is set the user will mention the parameter
         2) If EC2_BACKUP_FLAGS_SSH environment variable is set then the key mentioned in the path is the keyname
         3) The user will provide instance type t1.micro
+PROBLEMS: 
+     # To allow the tool to support multiple flags. We tried to add a case statement to accept no parameters for flag "" ie null parameter
+       but were unable to add the case statement as *) was overiding the "") condition. Hence if the flag is mentioned the user will have
+       include the parameter
+     # The user could enter any string as volume ID. To avoid it from happening we included a regex condition in the case statment
+     # While working on methods of backup, the ubuntu instance was logged into as ubuntu user hence the tool was facing permission issues
+       while performing the backup. We then included the switch to sudo proviliges to provide the back
+     # While considering the environment variable EC2_BACKUP_FLAGS_SSH we couldn't verify that the keypath provided is also the keyname as
+       as those fields are filtered out while saving the key (--query "KeyMaterial"). Hence we assume that the key-pair consists the same 
+       naming scheme as the key-name
 
 AUTHORS:
         Ramit Farwaha <rfarwaha@stevens.edu>
