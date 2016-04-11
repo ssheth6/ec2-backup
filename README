@@ -1,4 +1,4 @@
-EC2-BACKUP(1)		  BSD General Commands Manual		 EC2-BACKUP(1)
+EC2-BACKUP(1)             General Commands Manual                EC2-BACKUP(1)
 
 NAME
      ec2-backup -- backup a directory into Elastic Block Storage (EBS)
@@ -15,10 +15,10 @@ DESCRIPTION
 OPTIONS
      ec2-backup accepts the following command-line flags:
 
-     -h 	   Print a usage statement and exit.
+     -h            Print a usage statement and exit.
 
-     -m method	   Use the given method to perform the backup.	Valid methods
-		   are 'dd' and 'rsync'; default is 'dd'.
+     -m method     Use the given method to perform the backup.  Valid methods
+                   are 'dd' and 'rsync'; default is 'dd'.
 
      -v volume-id  Use the given volume instead of creating a new one.
 
@@ -35,17 +35,13 @@ DETAILS
 
      ec2-backup will create an instance suitable to perform the backup, attach
      the volume in question and then back up the data from the given directory
-     using the specified method and then shut down and terminate the instance
-     it created.
-
-OUTPUT
+     using the specified method and then shut down and terminate the instanceOUTPUT
      By default, ec2-backup prints the volume ID of the volume to which it
      backed up the data as the only output.  If the EC2_BACKUP_VERBOSE envi-
      ronment variable is set, it may also print out some useful information
      about what steps it is currently performing.
 
-     Any errors encountered cause a meaningful error message to be printed to
-     STDERR.
+     Any errors encountered cause a meaningful error message to be printed out
 
 ENVIRONMENT
      ec2-backup assumes that the user has set up their environment for general
@@ -73,41 +69,71 @@ EXAMPLES
 
      To back up the entire filesystem using rsync(1):
 
-	   $ ec2-backup -m rsync /
-	   vol-a1b2c3d4
-	   $ echo $?
-	   0
-	   $
-
-     To create a complete backup of the current working directory using
-     defaults (and thus not requiring a filesystem to exist on the volume) to
+           $ ec2-backup -m rsync /
+           vol-a1b2c3d4
+      To create a complete backup of the current working directory using
+       defaults (and thus not requiring a filesystem to exist on the volume) to
      the volume with the ID vol-1a2b3c4d:
 
-	   ec2-backup -v vol-1a2b3c4d .
+           ec2-backup -v vol-1a2b3c4d .
 
      Suppose a user has their ~/.ssh/config set up to use the private key
-     ~/.ec2/stevens but wishes to use the key ~/.ssh/ec2-key instead:
+     ~/.ec2/stevens but wishes to use the key ~/.ssh/ec2-key instead:Consideration
+        here is the ec2-key is the keyname
 
-	   $ export EC2_BACKUP_FLAGS_SSH="-i ~/.ssh/ec2-key"
-	   $ ec2-backup .
-	   vol-a1b2c3d4
-	   $
+
+           $ export EC2_BACKUP_FLAGS_SSH="-i ~/.ssh/ec2-key"
+           $ ec2-backup .
+           vol-a1b2c3d4
+           $
 
      To force creation of an instance type of t1.micro instead of whatever
      defaults might apply
 
-	   $ export EC2_BACKUP_FLAGS_AWS="--instance-type t1.micro"
-	   $ ec2-backup .
-	   vol-a1b2c3d4
-	   $
-
-SEE ALSO
-     aws help, dd(1), tar(1), rsync(1)
-
+           $ export EC2_BACKUP_FLAGS_AWS="--instance-type t1.micro"
+           $ ec2-backup .
+           vol-a1b2c3d4
+           $
+           
 HISTORY
-     ec2-backup was originally assigned by Jan Schaumann
-     <jschauma@cs.stevens.edu> as a homework assignment for the class "Aspects
-     of System Administration" at Stevens Institute of Technology in the
-     Spring of 2011.
+        This tool has been written in BASH language. It offers functional improvements over sh for both programming and interactive use;
+        these include command line editing, unlimited size command history, job control, shell functions and aliases, indexed arrays of unlimited size,
+        and integer arithmetic in any base from two to sixty-four. Bash can run most sh scripts without modification.
 
-BSD				March 27, 2016				   BSD
+APPROACH
+        We listed out the features that the tool could support.
+        Features:
+                # User can run this tool by only specifying the directory and the rest will be taken care of by the tool for the user
+                # User has the option of specifying the method to perform the backup. Valid methods are 'dd' and 'rsync'; default is 'dd'.
+                # User has the option to forcing the tool to use the specified volume-id instead of creating one
+                # Tool supports the following combinations:
+                        a)  -m dd/rsync -v <Available Volume-id> path-to-directory/file
+                        b)  -v <Available Volume-id> path-to-directory/file
+                        c)  -m dd/rsync path-to-directory/file
+                        d)   path-to-directory/file or (.) the current working directory
+                # User can force the instance-type to t1.micro instead of the default t2.micro
+                # User can provide the key he wishes to choose or let the tool create a new one
+                # After the backup. The tool terminates the instance created for the backup
+                # Incase the user wishes to abort the execution of the tool. On the key-press of Ctrl+C the tool would gracefully terminate the background
+                  running instance created for the backup
+        Created the skeleton plan to support these features
+        Created a repository on GitHub. Divided the functionality amongst the team members. A branch was created for every feature supported.
+        Once the feature was tested and ready to deployed, a peer review request was created for the team and thereafter merged to the master branch on GitHub.
+        This approach helped in synchronizing the work distributed.
+
+CONSIDERATIONS:
+        1) If a flag is set the user will mention the parameter
+        2) If EC2_BACKUP_FLAGS_SSH environment variable is set then the key mentioned in the path is the keyname
+        3) The user will provide instance type t1.micro
+
+AUTHORS:
+        Ramit Farwaha <rfarwaha@stevens.edu>
+        Sneha Sheth <ssheth6@stevens.edu>
+        Smruthi Karinatte <skarinat@stevens.edu>
+
+REFERENCES:
+         aws help, dd(1), tar(1), rsync(1), shift(1), Github help
+
+        
+
+            
